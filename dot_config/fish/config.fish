@@ -52,6 +52,7 @@ end
 
 # ls command color change => chien
 export LSCOLORS=gxfxcxdxbxegedabagacad
+set -g fish_color_match --background=brblue
 
 # pnpm
 set -gx PNPM_HOME "/Users/tsonobe/Library/pnpm"
