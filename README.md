@@ -56,6 +56,7 @@ Current examples in this repo:
 - `dot_zshrc` -> `~/.zshrc`
 - `dot_config/fish/config.fish` -> `~/.config/fish/config.fish`
 - `dot_config/gh/config.yml` -> `~/.config/gh/config.yml`
+- `private_dot_emacs.d/init.el` -> `~/.emacs.d/init.el`
 - `private_dot_emacs.d/config/myinit.org` -> `~/.emacs.d/config/myinit.org`
 
 ## Notes
