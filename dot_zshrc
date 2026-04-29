@@ -1,2 +1,24 @@
 
 . "$HOME/.local/bin/env"
+
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init zsh)"
+fi
+
+cghq() {
+  if ! command -v ghq >/dev/null 2>&1; then
+    print -u2 "ghq is not installed"
+    return 1
+  fi
+
+  if ! command -v fzf >/dev/null 2>&1; then
+    print -u2 "fzf is not installed"
+    return 1
+  fi
+
+  local selected
+  selected="$(ghq list --full-path | fzf --height 40% --reverse)" || return 1
+  if [ -n "$selected" ]; then
+    cd -- "$selected"
+  fi
+}

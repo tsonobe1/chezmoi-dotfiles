@@ -61,5 +61,27 @@ if not string match -q -- $PNPM_HOME $PATH
 end
 # pnpm end
 
+# ghq / fzf / zoxide
+if type -q zoxide
+    zoxide init fish | source
+end
+
+function cghq --description "Select a ghq-managed repository and cd there"
+    if not type -q ghq
+        echo "ghq is not installed" >&2
+        return 1
+    end
+
+    if not type -q fzf
+        echo "fzf is not installed" >&2
+        return 1
+    end
+
+    set -l selected (ghq list --full-path | fzf --height 40% --reverse)
+    if test -n "$selected"
+        cd -- "$selected"
+    end
+end
+
 # Added by Antigravity
 fish_add_path /Users/tsonobe/.antigravity/antigravity/bin
