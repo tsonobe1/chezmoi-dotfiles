@@ -2,9 +2,21 @@
 
 This repository is the source of truth for local dotfiles managed by `chezmoi`.
 
+## Mac setup
+
+On a new Mac, install `ghq` and `chezmoi`, clone this repository under `ghq`, and initialize `chezmoi` from that source directory.
+
+```bash
+brew install ghq chezmoi
+ghq get git@github.com:tsonobe1/chezmoi-dotfiles.git
+chezmoi init --source "$HOME/ghq/github.com/tsonobe1/chezmoi-dotfiles" --apply
+```
+
+これで、chezmoi が管理している `~/.zshrc`、`~/.config/fish/config.fish`、`~/.gitconfig` などが、それぞれ本来の場所に反映されます。
+
 ## Source of truth
 
-- Source repo: `~/.local/share/chezmoi`
+- Source repo: `~/ghq/github.com/tsonobe1/chezmoi-dotfiles`
 - Apply destination: `~`
 - Remote: `git@github.com:tsonobe1/chezmoi-dotfiles.git`
 
@@ -17,7 +29,7 @@ Edit files in this repository first.
 Examples:
 
 ```bash
-cd ~/.local/share/chezmoi
+cd ~/ghq/github.com/tsonobe1/chezmoi-dotfiles
 vi dot_gitconfig
 vi dot_config/fish/config.fish
 vi private_dot_emacs.d/config/myinit.org
@@ -38,7 +50,7 @@ chezmoi diff
 ## Save changes to GitHub
 
 ```bash
-cd ~/.local/share/chezmoi
+cd ~/ghq/github.com/tsonobe1/chezmoi-dotfiles
 git status
 git add .
 git commit -m "Update dotfiles"
