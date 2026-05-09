@@ -1,0 +1,4 @@
+interface:
+  display_name: "Empirical Prompt Tuning"
+  short_description: "Evaluate and refine prompts with subagent evidence"
+  default_prompt: "Use $empirical-prompt-tuning to harden this instruction by running independent subagents against fixed scenarios and iterating until convergence."

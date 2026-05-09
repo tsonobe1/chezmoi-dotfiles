@@ -1,0 +1,4 @@
+interface:
+  display_name: "Emacs Config Refactor"
+  short_description: "Refactor shared Emacs config safely"
+  default_prompt: "Use $emacs-config-refactor to clean up this shared Emacs config without breaking the synced Windows and macOS setup."
