@@ -142,9 +142,13 @@ mode ごとに最小十分な validation を選ぶ。
 - **文書更新のみ**: 変更ファイル単位の整形、リンク、見出し、参照整合を確認する。
 - **レビューのみ / 仕様整理のみ / 原因調査**: 実装用 gate は原則不要。必要なら調査コマンドや再現手順を validation として扱う。
 
+validation result は `targeted gate` と `PR-ready full gate` を分けて報告する。`targeted gate` は変更面に直接対応する最小十分な確認、`PR-ready full gate` は PR 前チェック一式（例: `pnpm lint`、`pnpm format:check`、`pnpm test`、`pnpm build`、`pnpm knip`、relevant E2E）を指す。targeted gate だけが通った場合は `full gate: not-run` と明示し、単に「品質ゲート通過」と書かない。
+
+full gate で追加の drift が見つかった場合は、修正前または最終報告で `feature diff` / `gate-sync diff` / `unrelated diff` に分類する。`gate-sync diff` は今回の feature を PR-ready にするために必要な schema、format、knip、test expectation、E2E harness contract の同期を指し、product behavior の追加変更ではないことを明示する。format / knip / test expectation / E2E harness の差分でも、今回の feature と無関係な既存 drift や別作業差分なら `unrelated diff` に分類する。
+
 validation が走れない場合は `not-run` ではなく、理由と次善の確認を書く。
 
-Native module ABI、rebuild、package install、Electron/Vite process cleanup、OS permission の失敗は、product bug として修正する前に runtime/tooling blocker として分類する。`NODE_MODULE_VERSION`、native binding load error、stale Electron process、permission denial は、それ単体では製品コード修正の根拠にしない。
+Native module ABI、rebuild、package install、Electron/Vite process cleanup、OS permission の失敗は、product bug として修正する前に runtime/tooling blocker として分類する。`NODE_MODULE_VERSION`、native binding load error、stale Electron process、permission denial は、それ単体では製品コード修正の根拠にしない。E2E failure が current product behavior と古い harness expectation の不一致だった場合は `harness expectation drift` と分類し、product bug として扱わない。期待値を直す場合は、現仕様の根拠と更新した scenario / helper / assertion を書く。
 
 # Compliance Checkpoint
 
@@ -177,6 +181,8 @@ commit、push、merge、rebase、review handoff など git gate の前には `gi
 - 依頼内容が未追跡 artifact の削除だけなら、それは commit 対象にならない。削除後に worktree が clean なら、新しい commit は作れないと commit 前に伝える。
 - merge / rebase / branch integration では、実行直前に target branch との commit 関係と worktree 状態を確認する。すでに同一 commit、up-to-date、または push 対象なしなら実行前に止める。
 - git 結果がユーザー期待とズレる場合は、commit / push 前に止めて「作る commit がない」「対象差分は既存 commit 済み」などを明示する。
+- commit 前に staged / unstaged の差分を `feature diff` / `gate-sync diff` / `unrelated diff` に分類し、今回 commit に含めるものと分けるものを報告する。`gate-sync diff` を feature commit に含める場合は、今回の変更を PR-ready にするための同期であることを明示する。`unrelated diff` は原則として含めない。
+- `unrelated diff` が残っているため full gate が PR-ready と言えない場合は、今回 commit から除外し、final で `full=<fail or not-ready>` と残課題を明示する。
 - final report では `commit: created <hash>` / `commit: not-created clean worktree` / `commit: already-existing <hash or unknown>` と、git action 全般の `action: not-needed` / `action: already-existing` を区別して書く。
 
 # Parallel Work
@@ -223,6 +229,17 @@ ADR: recorded / not-needed
 実装タスクで Review-Fix loop を回した後の最終報告では、`ユーザが今できること` を必ず具体的な操作・表示・制約で説明する。内部変更やテスト通過だけで終わらせず、「ユーザー目線で何が増えたか / 何が安全になったか / まだ何ができないか」を短く書く。
 
 Review-Fix loop を回した場合は、finding disposition と residual risk を短く書く。未承認の仕様変更、legacy migration、破壊的変更、テスト方針変更を `approved` / `合意済み` と書かない。包括編集許可で進めた範囲と、未解決 gate を分けて書く。
+
+実装タスクの final は、短くても次の footer を落とさない。commit 後の final でも、commit 結果だけに縮退させず実装 final artifact を残す。
+
+```text
+quality gate: targeted=<pass/fail/not-run>, full=<pass/fail/not-run>, e2e=<pass/fail/not-run/n-a>
+scope: feature diff=<included/n-a>, gate-sync diff=<included/separate/n-a>, unrelated diff=<excluded/n-a>
+failure log: recorded / not-needed
+ADR: recorded / not-needed
+Collab Audit: included / n-a
+commit: created <hash> / not-created <reason> / n-a
+```
 
 hard gate や mode 契約を破った場合は `protocol violation` を明示し、何を破ったか、いつ破ったか、信頼性への影響、次回の防止策を書く。違反がなければ必要に応じて `protocol violation: none` と短く書く。
 

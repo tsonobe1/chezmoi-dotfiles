@@ -135,9 +135,11 @@
 5. 各 finding は最終的に `fixed` / `needs user confirmation` / `rejected by current constraint` / `not reproduced` / `deferred` のいずれかに disposition し、根拠を残す。
 6. finding が明示済み制約（例: fallback 不要、migration 不要、後方互換不要）と衝突する場合は、0 findings にするために実装しない。制約自体を見直す必要があるなら Stop And Ask、見直し不要なら `rejected by current constraint` にする。
 7. subagent の validation 失敗は、親 session の official gate 結果と分けて扱う。native ABI、process cleanup、permission、harness 差分が疑われる失敗は、official gate で再現するまで product finding と断定しない。
-8. 修正後は再び複数の Review/Audit agent で並列レビューする。
-9. `fixed` できる findings が 0 になり、残った finding の disposition と residual risk が説明できるまで 3-8 を繰り返す。
-10. `仕様変更または漏れ`、`テスト方針変更`、`破壊的変更`、`判断保留` は Stop And Ask に戻し、ユーザ承認なしに実装しない。
+8. gate-sync diff は、今回の feature を PR-ready にするために必要な schema、format、knip、test expectation、E2E harness contract の同期を指す。product behavior の追加変更ではないことを finding disposition に残す。
+9. E2E failure が current product behavior と古い harness expectation の不一致だった場合は `harness expectation drift` と分類し、product bug として扱わない。期待値を直す場合は、現仕様の根拠と更新した scenario / helper / assertion を書く。
+10. 修正後は再び複数の Review/Audit agent で並列レビューする。
+11. `fixed` できる findings が 0 になり、残った finding の disposition と residual risk が説明できるまで 3-10 を繰り返す。
+12. `仕様変更または漏れ`、`テスト方針変更`、`破壊的変更`、`判断保留` は Stop And Ask に戻し、ユーザ承認なしに実装しない。
 
 この loop は commit 承認や push 承認を含まない。review gate が完了しても、git gate は別に扱う。
 
