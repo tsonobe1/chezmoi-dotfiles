@@ -5,21 +5,39 @@ description: Refactor and maintain the shared Emacs configuration in `~/.emacs.d
 
 # Emacs Config Refactor
 
+## Use When
+
+- The user wants to refactor or maintain the shared Emacs config in `~/.emacs.d`.
+- Use for behavior-preserving cleanup, smoke-harness-first refactoring, package/bootstrap consolidation, dead config removal after a baseline, startup cleanup, or cross-OS portability work.
+- Do not use this for generic Emacs Lisp work outside this repo, or for normal application code that only happens to be written in Emacs Lisp.
+
+## Goal
+
+Keep the shared macOS/Windows Emacs config maintainable without accidentally changing behavior, breaking Syncthing portability, or editing generated artifacts as the source of truth.
+
+## Done
+
+- The task type is classified before editing.
+- `config/myinit.org` remains the primary editing surface unless the user explicitly changes the source-of-truth contract.
+- Behavior-preserving work has a protected baseline or a stated verification gap.
+- Smoke or cheap verification relevant to the slice has been run, or the blocker is reported.
+- Commit, package strategy, source-of-truth, or broad removal gates are not crossed without explicit user confirmation.
+
+## Stop
+
+Stop and confirm when:
+
+- changing the package-manager strategy or bootstrap order
+- changing the source of truth away from `config/myinit.org`
+- changing the Windows sync layout or path model
+- removing features whose usage is still unclear
+- making broad startup or performance changes without first protecting the baseline
+
 ## Overview
 
 Use this skill for the shared Emacs config repo at `~/.emacs.d`, where the same files are synced to Windows and macOS. It keeps the work in the right order: stabilize current behavior first, then clean structure, then remove dead config or improve startup.
 
 If the user wants explicit approval gates, structured `it.todo`, or strict TDD flow, combine this skill with `$collab-loop`. This skill provides Emacs-config-specific facts and workflow, not the outer collaboration contract.
-
-## When To Use
-
-- The user wants to clean up `init.el`, `config/myinit.org`, or `config/myinit.el`
-- The user wants to refactor first without changing behavior
-- The user wants to remove unused packages, hooks, commands, or duplicated config after protecting the baseline
-- The user wants to improve startup or package bootstrap safely
-- The user wants to preserve the shared Windows and macOS setup while restructuring the config
-
-Do not use this skill for generic Emacs Lisp work outside this repo, or for normal application code that only happens to be written in Emacs Lisp.
 
 ## Current Repo Facts
 
@@ -69,16 +87,6 @@ Read `references/repo-facts.md` for the current command patterns, verification c
 - Keep secrets and machine-local data out of tests
 - If `custom-set-variables` or generated blocks are duplicated, decide one canonical location before further cleanup
 
-## Stop And Ask
-
-Stop and confirm when:
-
-- changing the package-manager strategy or bootstrap order
-- changing the source of truth away from `config/myinit.org`
-- changing the Windows sync layout or path model
-- removing features whose usage is still unclear
-- making broad startup or performance changes without first protecting the baseline
-
 ## Verification
 
 - Start with the existing smoke harness
@@ -88,6 +96,10 @@ Stop and confirm when:
 - Before committing, tell the user what the pending commit contains in concrete terms and wait for confirmation
 - Treat commit-time verification as mandatory: before committing, rerun the smoke or cheap verification that protects the slice and report the result
 - Treat review as a separate gate from test execution: do not commit immediately after tests pass; review the change and surface findings first
+
+## Output
+
+Final response should state what changed, what behavior was preserved or intentionally changed, verification result, unresolved OS assumptions, and the next safe action.
 
 See `references/repo-facts.md` for the current smoke-test command and repo-specific grep patterns.
 

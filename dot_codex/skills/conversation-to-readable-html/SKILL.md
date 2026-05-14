@@ -3,9 +3,33 @@ name: conversation-to-readable-html
 description: Convert conversation logs, research findings, design notes, implementation notes, reviews, or long decision discussions into a visually scannable single self-contained HTML document. Use when the user asks to HTML化, make a readable HTML report, turn notes into a browser-viewable document, or preserve chat, research, or design content for later review.
 ---
 
-# conversation-to-readable-html
+# Conversation To Readable HTML
 
 Convert input content into a single self-contained HTML file that can be opened locally in a browser.
+
+## Use When
+
+- The user asks to HTML化, create a readable HTML report, or preserve a conversation, research note, design note, implementation note, review, or decision discussion for later review.
+- Do not use this for normal Markdown cleanup, public publishing, or app UI implementation unless the user explicitly asks for a local single-file HTML artifact.
+
+## Goal
+
+Produce a browser-openable local HTML document that helps the reader understand the topic, conclusion, evidence, unresolved questions, and next actions faster than reading the original source order.
+
+## Done
+
+- The artifact is one self-contained `.html` file with inline CSS and no external dependencies.
+- The opening explains what the document is about and the current conclusion or decision state.
+- Facts, decisions, assumptions, unresolved questions, and next actions are separated when they exist.
+- `scripts/check_html.py <file.html>` passes, or the blocker and next-best validation are reported.
+
+## Stop
+
+Stop and ask before continuing when:
+
+- the user has not provided enough source material to identify the topic or conclusion
+- the requested artifact requires publishing, sharing, or uploading outside the local filesystem
+- the source contains sensitive material and the requested destination is unclear
 
 ## Core Rule
 
@@ -33,6 +57,10 @@ Keep these distinctions explicit:
 4. Write one complete HTML document with inline CSS and no external dependencies.
 5. Save it as a local `.html` file in a sensible location for the current task.
 6. Run `scripts/check_html.py <file.html>` and fix any reported issues before returning the path.
+
+## Output
+
+Final response should state the artifact path, what the reader can now use it for, validation result, and any unresolved source or validation gaps.
 
 ## Required Opening
 

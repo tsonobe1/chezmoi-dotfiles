@@ -7,6 +7,35 @@ description: Agent 向けテキスト指示（skill、slash command、task promp
 
 対象指示を自分で読み直して済ませない。固定したシナリオと要件チェックリストを先に決め、白紙の subagent を使って実測し、自己申告と指示側メトリクスの両面から改善点を詰める。
 
+## Use When
+
+- skill、slash command、task prompt、CLAUDE.md 節、コード生成プロンプトを新規作成または大幅改訂した直後
+- エージェントの挙動が期待に届かず、原因が指示側の曖昧さにありそうなとき
+- 頻繁に使う skill や自動化の中核プロンプトを堅牢化したいとき
+- 実タスクの transcript を見て、skill の設計思想、hard gate、artifact 契約が本当に守られたか監査したいとき
+
+Do not use this for one-off prompts or preference-only wording tweaks where success does not need to generalize.
+
+## Goal
+
+Improve an agent-facing instruction by testing it against fixed scenarios, separating instruction defects from operation defects, and applying the smallest change that improves the measured behavior.
+
+## Done
+
+- description/body alignment has been checked before execution tuning
+- scenarios and `[critical]` checklist items are fixed before evaluation
+- results distinguish self-reported ambiguity from instruction-side pass/fail
+- any edit is tied to a failed or weak checklist item
+- heavily revised or high-impact instructions receive a fresh hold-out check when subagents are available
+
+## Stop
+
+Stop and ask when:
+
+- the target instruction, desired behavior, or evaluation scenario is not identifiable
+- a proposed fix would change a hard gate, approval boundary, or product contract outside the prompt-maintenance scope
+- subagents are required by the requested rigor but unavailable in the current environment
+
 ## モード
 
 この skill は次の 2 モードを扱う。
@@ -15,18 +44,6 @@ description: Agent 向けテキスト指示（skill、slash command、task promp
 - **compliance audit mode**: 実タスクの transcript、diff、最終報告を監査し、対象 skill や prompt の遵守状況を点検する
 
 曖昧なときは execution tuning mode を既定とし、`守られたか` を見たい依頼では compliance audit mode を使う。
-
-## いつ使うか
-
-- skill、slash command、task prompt を新規作成または大幅改訂した直後に使う
-- エージェントの挙動が期待に届かず、原因が指示側の曖昧さにありそうなときに使う
-- 頻繁に使う skill や自動化の中核プロンプトを堅牢化したいときに使う
-- 実タスクの transcript を見て、skill の設計思想、hard gate、artifact 契約が本当に守られたか監査したいときに使う
-
-次では使わない。
-
-- 一回限りの使い捨てプロンプト
-- 成功率ではなく書き手の好みだけを反映したいケース
 
 ## ワークフロー
 
