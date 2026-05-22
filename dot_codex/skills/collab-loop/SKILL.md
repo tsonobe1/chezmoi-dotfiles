@@ -93,12 +93,14 @@ identity: cwd=<path>, worktree=<path>, branch=<name>, spec=<agreed source>, feat
 1. `作業前提`、`今回の製品機能`、`非対象` を分ける。
 2. `it.todo` 前に spec audit を行う。
 3. 合意済みの全振る舞いを、ユーザーが見る対象・操作・結果で書いた日本語 `it.todo` として提示する。実装名、DOM名、内部型、repository/API名を先に出さない。
-4. 既存テストを `残す / 修正する / 不要になる` に棚卸しする。
-5. `it.todo` / テストケースが collab-loop の structured test format と user-visible wording contract に準拠しているか、ユーザに聞かれる前に自己点検する。
-6. 承認前に Red / Green / Refactor を始めない。
-7. 承認後は合意済みの全 `it.todo` を一気通貫で TDD する。
-8. TDD 後は並列レビューを行い、findings があれば finding ごとの disposition を残して修正または Stop And Ask へ進む。仕様内修正は再レビューまで自走し、仕様変更や漏れ、明示制約と衝突する finding は勝手に実装しない。
-9. runtime boundary、保存、IPC、Quick Launcher、Electron window、theme rehydrate は unit/component test だけで完了扱いしない。
+4. `it.todo` は collab-loop の structured test format と user-visible wording contract に従って作る。
+5. `it.todo` はアプリケーションアーキテクチャの各レイヤに置くことを想定し、各 spec ファイルごとに作成する。
+6. 既存テストを `残す / 修正する / 削除する / 不要になる` に棚卸しし、更新・削除すべきテストケースを明示する。
+7. `it.todo` / テストケースが collab-loop の structured test format と user-visible wording contract に準拠しているか、ユーザに聞かれる前に自己点検する。
+8. 承認前に Red / Green / Refactor を始めない。
+9. 承認後は合意済みの全 `it.todo` を一気通貫で TDD する。
+10. TDD 後は並列レビューを行い、findings があれば finding ごとの disposition を残して修正または Stop And Ask へ進む。仕様内修正は再レビューまで自走し、仕様変更や漏れ、明示制約と衝突する finding は勝手に実装しない。
+11. runtime boundary、保存、IPC、Quick Launcher、Electron window、theme rehydrate は unit/component test だけで完了扱いしない。
 
 # Review Flow
 
