@@ -250,6 +250,8 @@
 ** straight.el
   #+begin_src emacs-lisp
     ;; straight.el ブートストラップ（GitHub リポジトリからのパッケージ取得用）
+    ;; Emacs 同梱の org-mode をそのまま使う（straight.el でビルドしない）
+    (setq straight-built-in-pseudo-packages '(org))
     (defvar bootstrap-version)
     (let ((bootstrap-file
            (expand-file-name
