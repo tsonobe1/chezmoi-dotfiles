@@ -117,7 +117,7 @@
 
 ## TDD Policy
 
-- 汎用的なテストケース設計原則は `../../tdd/test-case-principles.md` に従う。ここでは Ugen 固有の workflow、承認、配置、runtime boundary、quality gate を追加する。
+- 汎用的なテストケース設計原則は `test-case-principles` skill に従う。ここでは Ugen 固有の workflow、承認、配置、runtime boundary、quality gate を追加する。
 - classical school を採用する
 - t-wada style TDD に従う
 - テスト名は日本語で、条件 + 結果を表現する

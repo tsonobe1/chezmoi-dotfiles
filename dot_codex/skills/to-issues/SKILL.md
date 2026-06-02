@@ -60,6 +60,12 @@ Publish issues in dependency order (blockers first) so you can reference real is
 
 A reference to the parent issue on the issue tracker (if the source was an existing issue, otherwise omit this section).
 
+## これは何の話？
+
+Explain the target area, the point under discussion, and any comparison targets in one or two short paragraphs. Write this as prose, not bullet points, so someone who has not read the original context can understand what this issue is about.
+
+Avoid heavy technical terminology. When domain-specific words are necessary, prefer the app's own domain vocabulary over implementation jargon.
+
 ## What to build
 
 A concise description of this vertical slice. Describe the end-to-end behavior, not layer-by-layer implementation.
