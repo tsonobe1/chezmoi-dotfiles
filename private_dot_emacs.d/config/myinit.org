@@ -247,6 +247,28 @@
     (setq use-package-always-ensure t
           package-enable-at-startup nil)
   #+end_src
+** straight.el
+  #+begin_src emacs-lisp
+    ;; straight.el ブートストラップ（GitHub リポジトリからのパッケージ取得用）
+    (defvar bootstrap-version)
+    (let ((bootstrap-file
+           (expand-file-name
+            "straight/repos/straight.el/bootstrap.el"
+            (or (bound-and-true-p straight-base-dir) user-emacs-directory)))
+          (bootstrap-version 7))
+      (unless (file-exists-p bootstrap-file)
+        (with-current-buffer
+            (url-retrieve-synchronously
+             "https://raw.githubusercontent.com/radian-software/straight.el/develop/install.el"
+             'silent 'inhibit-cookies)
+          (goto-char (point-max))
+          (eval-print-last-sexp)))
+      (load bootstrap-file nil 'nomessage))
+
+    ;; use-package で :straight キーワードを使えるようにする
+    (straight-use-package 'use-package)
+    (setq straight-use-package-by-default nil)
+  #+end_src
 * org-mode
 ** babel
   #+BEGIN_SRC emacs-lisp
@@ -643,78 +665,7 @@
   (my/after-org-load
     ;; Effort_ALL に列挙した値だけを C-c C-x e 時に補完
     (setq org-global-properties
-	  '(("Effort_ALL" . "0:05 0:10 0:15 0:30 0:45 1:00")))
-
-    ;; 時間文字列→分 に変換するために必要
-    (require 'org-duration)
-
-    ;; ------------------------------------------------------------
-    ;; Effort 設定時に30分以上なら「break down」を推奨する
-    ;; ------------------------------------------------------------
-    (defun my/org-check-effort-breakdown (&rest _args)
-      "Effort プロパティを設定した後に呼ばれ、30分以上なら分割を促す。"
-      (when-let* ((effort-str (org-entry-get nil "Effort"))
-		  (min         (org-duration-to-minutes effort-str)))
-	(when (>= min 30)
-	  (message
-	   "⚠️ Effort が %d 分です。タスクを30分未満に分割（break down）することを検討してください。"
-	   min))))
-
-    ;; org-set-effort 実行後にチェック
-    (advice-add 'org-set-effort :after #'my/org-check-effort-breakdown)
-
-    (defcustom my/org-effort-diff-threshold 10
-      "Effort と CLOCK 合計の差がこれ（分）を超えたときに理由を聞く。"
-      :type 'integer)
-
-    (defcustom my/org-effort-diff-property "WhyDiff"
-      "差異の理由を記録する PROPERTIES のキー。"
-      :type 'string)
-
-    ;; LOGBOOK 内の CLOCK: 行を合計して分で返すヘルパー
-    (defun my/org-get-logbook-total-minutes ()
-      "現在のエントリのLOGBOOK内CLOCK合計を分単位で返す。"
-      (save-excursion
-	(let* ((subtree-end (save-excursion (org-end-of-subtree t)))
-	       (log-start
-		(when (re-search-forward "^:LOGBOOK:" subtree-end t)
-		  (forward-line 1) (point)))
-	       (log-end
-		(when log-start
-		  (save-excursion
-		    (goto-char log-start)
-		    (re-search-forward "^:END:" subtree-end t)
-		    (match-beginning 0))))
-	       (sum 0))
-	  (when (and log-start log-end)
-	    (goto-char log-start)
-	    (while (re-search-forward
-		    "^CLOCK:.*=>[ \t]*\\([0-9]+\\):\\([0-9]+\\)"
-		    log-end t)
-	      (let ((h (string-to-number (match-string 1)))
-		    (m (string-to-number (match-string 2))))
-		(setq sum (+ sum (+ (* 60 h) m))))))
-	  sum)))
-
-    ;; Effort vs CLOCK 差異チェック本体
-    (defun my/org-check-effort-diff ()
-      "TODO→DONE 時に Effort と CLOCK 合計を比較し、差が大きければ理由を記録。"
-      (when (and (string= org-state "DONE")
-		 (org-entry-get nil "Effort"))
-	(let* ((effort-min (org-duration-to-minutes (org-entry-get nil "Effort")))
-	       (total-min  (my/org-get-logbook-total-minutes))
-	       (diff       (- total-min effort-min)))
-	  (message "[EffortDiff] effort=%d 分, total=%d 分, diff=%+d 分"
-		   effort-min total-min diff)
-		  (when (> (abs diff) my/org-effort-diff-threshold)
-		    (let ((reason
-			   (read-string
-			    (format "effort:%d分, total:%d分, diff:%+d分 (差異しきい値:%d分) Why?: "
-				    effort-min total-min diff my/org-effort-diff-threshold))))
-		      (org-entry-put nil my/org-effort-diff-property reason))))))
-
-    ;; DONE への状態変更後にフック登録
-    (add-hook 'org-after-todo-state-change-hook #'my/org-check-effort-diff))
+	  '(("Effort_ALL" . "0:05 0:10 0:15 0:30 0:45 1:00"))))
 
 (defun my-clocktable-write-reorder (&rest args)
   "Org clocktable をデフォルト出力したあと、
@@ -999,335 +950,75 @@
 #+END_SRC
 
 #+begin_src emacs-lisp
-(defconst my/fibonacci-points '(1 2 3 5 8 13 21 34 55 89)
-  "Fibonacci-like points available for Storypoint selection.")
+  ;; org-storypoint パッケージ（GitHub: tsonobe1/org-storypoint）
+  (use-package org-storypoint
+    :straight (:host github :repo "tsonobe1/org-storypoint")
+    :hook (org-mode . org-storypoint-mode)
+    :bind (:map org-mode-map
+           ("C-c s s" . org-storypoint-set)
+           ("C-c s e" . org-storypoint-assign-efforts)
+           ("C-c s p" . org-storypoint-progress)
+           ("C-c s w" . org-storypoint-set-weekend)))
+#+end_src
 
-(defconst my/org-storypoint-time-options
-  '("0:01" "0:03" "0:05" "0:10" "0:15" "0:30" "0:45" "1:00")
-  "Candidate base effort times for Storypoint expansion.")
-
-(defconst my/org-storypoint-safety-options
-  '(("普通" . 0)
-    ("少し安全" . 1)
-    ("かなり安全" . 2))
-  "Safety margins available for three-point Storypoint estimates.")
-
-(defun my/org--format-storypoint (point)
-  "Format POINT without trailing .0 when it is an integer."
-  (if (= point (floor point))
-      (number-to-string (floor point))
-    (format "%.1f" point)))
-
-(defun my/org--completing-read-in-order (prompt collection)
-  "Read from COLLECTION with PROMPT while preserving collection order."
-  (let ((vertico-sort-function nil))
-    (completing-read prompt collection nil t)))
-
-(defun my/org--read-storypoint (prompt &optional min-point)
-  "Read a Storypoint value with PROMPT from Fibonacci candidates.
-When MIN-POINT is non-nil, offer only candidates greater than or equal to it."
-  (string-to-number
-   (my/org--completing-read-in-order
-    prompt
-    (mapcar #'number-to-string
-            (seq-filter (lambda (point)
-                          (or (null min-point) (>= point min-point)))
-                        my/fibonacci-points)))))
-
-(defun my/org--storypoint-estimate (optimistic most-likely pessimistic safety-factor)
-  "Return PERT estimate using OPTIMISTIC, MOST-LIKELY, PESSIMISTIC and SAFETY-FACTOR."
-  (let* ((expected (/ (+ optimistic (* 4 most-likely) pessimistic) 6.0))
-         (sigma (/ (- pessimistic optimistic) 6.0)))
-    (+ expected (* safety-factor sigma))))
-
-(defun my/org-set-story-point ()
-  "Prompt for three-point Storypoint estimates and set Org properties."
-  (interactive)
-  (let* ((optimistic (my/org--read-storypoint "Storypoint optimistic (O): "))
-         (most-likely (my/org--read-storypoint "Storypoint most likely (M): " optimistic))
-         (pessimistic (my/org--read-storypoint "Storypoint pessimistic (P): " most-likely)))
-    (unless (<= optimistic most-likely pessimistic)
-      (user-error "Expected O <= M <= P"))
-    (let* ((safety-label
-            (my/org--completing-read-in-order
-             "Safety: "
-             (mapcar #'car my/org-storypoint-safety-options)))
-           (safety-factor (cdr (assoc safety-label my/org-storypoint-safety-options)))
-           (expected (/ (+ optimistic (* 4 most-likely) pessimistic) 6.0))
-           (sigma (/ (- pessimistic optimistic) 6.0))
-           (selected (my/org--storypoint-estimate optimistic most-likely pessimistic safety-factor)))
-      (org-set-property "StorypointOptimistic" (my/org--format-storypoint optimistic))
-      (org-set-property "StorypointMostLikely" (my/org--format-storypoint most-likely))
-      (org-set-property "StorypointPessimistic" (my/org--format-storypoint pessimistic))
-      (org-set-property "StorypointExpected" (my/org--format-storypoint expected))
-      (org-set-property "StorypointSigma" (my/org--format-storypoint sigma))
-      (org-set-property "StorypointSafety" safety-label)
-      (org-set-property "Storypoint" (my/org--format-storypoint selected)))))
-
-    (defun my/org--get-storypoint ()
-      "Get storypoint as number, or nil if not set or invalid."
-      (let ((val (org-entry-get (point) "Storypoint")))
-	(when (and val (string-match-p "^[0-9]+\\(?:\\.[0-9]+\\)?$" val))
-	  (string-to-number val))))
-
-    (defun my/org--get-effort-from-point (base-point base-minutes)
-      "Compute effort string like 0:05 for a given point and base."
-      (let ((total (round (* base-minutes base-point))))
-	(format "%d:%02d" (/ total 60) (% total 60))))
-
-(defun my/org-assign-efforts-based-on-storypoints (start end)
-  "Assign Effort properties to child tasks based on storypoints.
-Also set total Effort and Storypoint on the top-level heading (excluding itself from aggregation)."
-  (interactive "r")
-  (let ((entries '())
-        (min-point most-positive-fixnum)
-        (total-storypoints 0)
-        (parent-marker (save-excursion
-                         (goto-char start)
-                         (org-back-to-heading t)
-                         (point-marker)))) ;; 親見出しの位置を記録
-
-    ;; collect all storypoints from children (excluding parent)
+#+begin_src emacs-lisp
+  ;; Drawer 非表示（org-storypoint とは独立した汎用機能）
+  (defun my/org-show-subtree-with-drawers-hidden ()
+    "Show the current Org subtree while keeping drawers folded."
+    (interactive)
+    (org-back-to-heading t)
+    (org-show-subtree)
     (save-excursion
-      (goto-char start)
-      (while (re-search-forward org-heading-regexp end t)
-        (save-excursion
-          (org-back-to-heading t)
-          (let ((pos (point)))
-            (unless (= pos (marker-position parent-marker)) ;; 親を除外
-              (let ((point-val (my/org--get-storypoint)))
-                (when point-val
-                  (push (cons (point-marker) point-val) entries)
-                  (setq min-point (min min-point point-val))
-                  (setq total-storypoints (+ total-storypoints point-val)))))))))
+      (let ((begin (save-excursion
+                     (org-back-to-heading t)
+                     (point)))
+            (end (save-excursion
+                   (org-end-of-subtree t t)
+                   (point))))
+        (my/org--hide-drawers-completely begin end))))
 
-    (if (null entries)
-        (message "No child tasks with Storypoint found.")
-	  (let* ((time-options my/org-storypoint-time-options)
-	         (base-choice (my/org--completing-read-in-order
-	                       "Time for 1 Storypoint: "
-	                       time-options))
-             (base-minutes (let* ((parts (split-string base-choice ":"))
-                                  (h (string-to-number (car parts)))
-                                  (m (string-to-number (cadr parts))))
-                             (+ (* h 60) m)))
-             (total-effort-minutes 0))
-        ;; assign Effort properties to each child
-        (dolist (entry entries)
-          (let ((marker (car entry))
-                (point-val (cdr entry)))
-            (with-current-buffer (marker-buffer marker)
-              (goto-char marker)
-              (let ((effort (my/org--get-effort-from-point point-val base-minutes)))
-                (org-set-property "Effort" effort)
-                (let* ((parts (split-string effort ":"))
-                       (effort-min (+ (* 60 (string-to-number (car parts)))
-                                      (string-to-number (cadr parts)))))
-                  (setq total-effort-minutes (+ total-effort-minutes effort-min)))))))
+  (defun my/org--hide-drawers-completely (begin end)
+    "Hide drawer blocks completely between BEGIN and END."
+    (save-excursion
+      (goto-char begin)
+      (while (and (< (point) end)
+                  (re-search-forward org-drawer-regexp end t))
+        (let* ((drawer (save-excursion
+                         (beginning-of-line)
+                         (org-element-at-point)))
+               (type (org-element-type drawer)))
+          (if (memq type '(drawer property-drawer))
+              (let* ((drawer-end (min (org-element-end drawer) end))
+                     (hide-end (save-excursion
+                                 (goto-char drawer-end)
+                                 (when (and (> (point) (org-element-begin drawer))
+                                            (eq (char-before) ?\n))
+                                   (backward-char))
+                                 (point))))
+                (org-fold-region (org-element-begin drawer) hide-end t 'drawer)
+                (goto-char drawer-end))
+            (forward-line 1))))))
 
-        ;; 親に合計をセット（自分自身の既存値は無視）
-        (with-current-buffer (marker-buffer parent-marker)
-          (goto-char parent-marker)
-          (let ((total (format "%d:%02d" (/ total-effort-minutes 60) (% total-effort-minutes 60))))
-            (org-set-property "Effort" total)
-            (org-set-property "Storypoint" (my/org--format-storypoint total-storypoints))
-            (message "Total effort: %s, Total storypoints: %s"
-                     total
-                     (my/org--format-storypoint total-storypoints))))))))
+  (defun my/org-cycle-hide-drawers-completely (state)
+    "Hide drawer blocks completely after Org visibility cycle STATE."
+    (when (and (derived-mode-p 'org-mode)
+               (not (memq state '(overview folded contents))))
+      (let* ((global-p (eq state 'all))
+             (begin (if global-p
+                        (point-min)
+                      (save-excursion
+                        (org-back-to-heading t)
+                        (point))))
+             (end (cond
+                   (global-p (point-max))
+                   (t (save-excursion
+                        (org-end-of-subtree t t)
+                        (point))))))
+        (my/org--hide-drawers-completely begin end))))
 
-
-
-    ;; キーバインド
-    (define-key org-mode-map (kbd "C-c C-x C-s") #'my/org-set-story-point)
-    (define-key org-mode-map (kbd "C-c C-x C-d") #'my/org-assign-efforts-based-on-storypoints)
-
-(defun my/org-progress-entry-at-point ()
-  "Return the current entry progress as a cons of storypoint and effort minutes."
-  (let* ((sp (string-to-number (or (org-entry-get nil "Storypoint") "0")))
-         (eff-min (org-duration-string-to-minutes
-                   (or (org-entry-get nil "Effort") "0:00"))))
-    (cons sp eff-min)))
-
-(defun my/org-done-progress-entries ()
-  "Return progress entries for DONE items in the current tree."
-  (org-map-entries #'my/org-progress-entry-at-point "TODO=\"DONE\"" 'tree))
-
-(defconst my/org-progress-weekend-options
-  '(("include" . "土日を含める")
-    ("exclude" . "土日を除外する"))
-  "Weekend counting options for Storypoint progress planning.")
-
-(defun my/org-set-progress-weekend ()
-  "Set whether weekend days count in Storypoint progress planning."
-  (interactive)
-  (let ((choice (my/org--completing-read-in-order
-                 "Progress weekend: "
-                 (mapcar #'car my/org-progress-weekend-options))))
-    (org-set-property "ProgressWeekend" choice)))
-
-(defun my/org--timestamp-to-absolute-date (timestamp)
-  "Return absolute date for Org TIMESTAMP, or nil when TIMESTAMP is missing."
-  (when timestamp
-    (let* ((parts (org-parse-time-string timestamp))
-           (day (nth 3 parts))
-           (month (nth 4 parts))
-           (year (nth 5 parts)))
-      (when (and day month year)
-        (calendar-absolute-from-gregorian (list month day year))))))
-
-(defun my/org--today-absolute-date ()
-  "Return today's absolute date."
-  (pcase-let ((`(,_sec ,_min ,_hour ,day ,month ,year . ,_)
-               (decode-time (current-time))))
-    (calendar-absolute-from-gregorian (list month day year))))
-
-(defun my/org--weekend-day-p (absolute-date)
-  "Return non-nil when ABSOLUTE-DATE is Saturday or Sunday."
-  (memq (calendar-day-of-week (calendar-gregorian-from-absolute absolute-date))
-        '(0 6)))
-
-(defun my/org--count-progress-days (start end include-weekend)
-  "Count planning days from START to END, inclusive.
-When INCLUDE-WEEKEND is nil, Saturdays and Sundays are skipped."
-  (let ((count 0))
-    (when (<= start end)
-      (dotimes (offset (1+ (- end start)))
-        (let ((day (+ start offset)))
-          (when (or include-weekend
-                    (not (my/org--weekend-day-p day)))
-            (setq count (1+ count))))))
-    count))
-
-(defun my/org--progress-status-label (gap)
-  "Return a Japanese progress status label for GAP Storypoints."
-  (cond
-   ((< gap -0.05) "遅れ")
-   ((> gap 0.05) "前倒し")
-   (t "順調")))
-
-(defun my/org-progress-plan-summary (total-sp done-sp)
-  "Return ideal Storypoint progress summary for TOTAL-SP and DONE-SP."
-  (let* ((start (my/org--timestamp-to-absolute-date (org-entry-get nil "SCHEDULED")))
-         (deadline (my/org--timestamp-to-absolute-date (org-entry-get nil "DEADLINE")))
-         (weekend (or (org-entry-get nil "ProgressWeekend") "include"))
-         (include-weekend (not (string= weekend "exclude"))))
-    (when (and start deadline (> total-sp 0))
-      (let* ((today (my/org--today-absolute-date))
-             (total-days (my/org--count-progress-days start deadline include-weekend))
-             (elapsed-end (min deadline today))
-             (elapsed-days (if (< today start)
-                               0
-                             (my/org--count-progress-days start elapsed-end include-weekend))))
-        (when (> total-days 0)
-          (let* ((sp-per-day (/ total-sp (float total-days)))
-                 (ideal-sp (min total-sp (* sp-per-day elapsed-days)))
-                 (ideal-pct (* 100.0 (/ ideal-sp (float total-sp))))
-                 (gap (- done-sp ideal-sp)))
-            (format "STATUS: %s %+.1fSP  実績 %s/%sSP  今日の目安 %sSP  必要ペース %sSP/日  土日:%s"
-                    (my/org--progress-status-label gap)
-                    gap
-                    (my/org--format-storypoint done-sp)
-                    (my/org--format-storypoint total-sp)
-                    (my/org--format-storypoint ideal-sp)
-                    (my/org--format-storypoint sp-per-day)
-                    (if include-weekend "含む" "除外"))))))))
-
-(defun org-calc-progress ()
-  "現在の見出しツリーの Storypoint と Effort の進捗を算出し、ミニバッファ表示とクリップボードにコピーする。"
-  (interactive)
-  (let* ((total-sp (string-to-number (or (org-entry-get nil "Storypoint") "0")))
-         (total-eff-min
-          (let ((s (or (org-entry-get nil "Effort") "0:00")))
-            (org-duration-string-to-minutes s)))
-         (entries (my/org-done-progress-entries))
-         (done-sp (apply #'+ (mapcar #'car entries)))
-         (done-eff-min (apply #'+ (mapcar #'cdr entries)))
-         (sp-pct (if (> total-sp 0)
-                     (* 100.0 (/ done-sp (float total-sp)))
-                   0.0))
-         (eff-pct (if (> total-eff-min 0)
-                      (* 100.0 (/ done-eff-min (float total-eff-min)))
-                    0.0))
-         (plan-summary (my/org-progress-plan-summary total-sp done-sp))
-         (result
-          (concat
-           (when plan-summary
-             (concat plan-summary "  "))
-           (format "Storypoint: %.1f%% (%s/%s)"
-                   sp-pct
-                   (my/org--format-storypoint done-sp)
-                   (my/org--format-storypoint total-sp))
-           (format "  Effort: %.1f%% (%s/%s)"
-                   eff-pct
-                   (org-duration-from-minutes done-eff-min)
-                   (org-duration-from-minutes total-eff-min)))))
-    (message "%s" result)
-    (kill-new result)))
-
-(defun my/org-show-subtree-with-drawers-hidden ()
-  "Show the current Org subtree while keeping drawers folded."
-  (interactive)
-  (org-back-to-heading t)
-  (org-show-subtree)
-  (save-excursion
-    (let ((begin (save-excursion
-                   (org-back-to-heading t)
-                   (point)))
-          (end (save-excursion
-                 (org-end-of-subtree t t)
-                 (point))))
-      (my/org--hide-drawers-completely begin end))))
-
-(defun my/org--hide-drawers-completely (begin end)
-  "Hide drawer blocks completely between BEGIN and END."
-  (save-excursion
-    (goto-char begin)
-    (while (and (< (point) end)
-                (re-search-forward org-drawer-regexp end t))
-      (let* ((drawer (save-excursion
-                       (beginning-of-line)
-                       (org-element-at-point)))
-             (type (org-element-type drawer)))
-        (if (memq type '(drawer property-drawer))
-            (let* ((drawer-end (min (org-element-end drawer) end))
-                   (hide-end (save-excursion
-                               (goto-char drawer-end)
-                               ;; Keep the trailing newline visible so adjacent
-                               ;; headings do not render on the same line.
-                               (when (and (> (point) (org-element-begin drawer))
-                                          (eq (char-before) ?\n))
-                                 (backward-char))
-                               (point))))
-              (org-fold-region (org-element-begin drawer) hide-end t 'drawer)
-              (goto-char drawer-end))
-          (forward-line 1))))))
-
-(defun my/org-cycle-hide-drawers-completely (state)
-  "Hide drawer blocks completely after Org visibility cycle STATE."
-  (when (and (derived-mode-p 'org-mode)
-             (not (memq state '(overview folded contents))))
-    (let* ((global-p (eq state 'all))
-           (begin (if global-p
-                      (point-min)
-                    (save-excursion
-                      (org-back-to-heading t)
-                      (point))))
-           (end (cond
-                 (global-p (point-max))
-                 (t (save-excursion
-                      (org-end-of-subtree t t)
-                      (point))))))
-      (my/org--hide-drawers-completely begin end))))
-
-;; org-calc-progress のキーバインドを C-c C-p に設定
-(my/after-org-load
-  (add-hook 'org-cycle-hook #'my/org-cycle-hide-drawers-completely)
-  (define-key org-mode-map (kbd "C-c C-p") #'org-calc-progress)
-  (define-key org-mode-map (kbd "C-c C-x C-g") #'my/org-set-progress-weekend)
-  (define-key org-mode-map (kbd "C-c C-x C-t") #'my/org-show-subtree-with-drawers-hidden))
-
-
-
+  (my/after-org-load
+    (add-hook 'org-cycle-hook #'my/org-cycle-hide-drawers-completely)
+    (define-key org-mode-map (kbd "C-c C-x C-t") #'my/org-show-subtree-with-drawers-hidden))
 #+end_src
 
 #+begin_src emacs-lisp
