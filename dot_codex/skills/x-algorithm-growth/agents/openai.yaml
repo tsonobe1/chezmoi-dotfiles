@@ -1,8 +1,0 @@
-interface:
-  display_name: "X Algorithm Growth"
-  short_description: "Plan X posts around For You signals"
-  brand_color: "#111827"
-  default_prompt: "Use $x-algorithm-growth to turn my current project work into X posts that grow followers without bait."
-
-policy:
-  allow_implicit_invocation: true
