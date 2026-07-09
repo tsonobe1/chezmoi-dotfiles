@@ -85,3 +85,7 @@ end
 
 # Added by Antigravity
 fish_add_path /Users/tsonobe/.antigravity/antigravity/bin
+
+# >>> grok installer >>>
+fish_add_path $HOME/.grok/bin
+# <<< grok installer <<<

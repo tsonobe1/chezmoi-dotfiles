@@ -33,7 +33,6 @@ cd ~/ghq/github.com/tsonobe1/chezmoi-dotfiles
 vi dot_gitconfig
 vi dot_config/fish/config.fish
 vi private_dot_emacs.d/config/myinit.org
-vi dot_codex/skills/<skill-name>/SKILL.md
 ```
 
 Apply changes to the real locations:
@@ -69,13 +68,14 @@ Current examples in this repo:
 - `dot_zshrc` -> `~/.zshrc`
 - `dot_config/fish/config.fish` -> `~/.config/fish/config.fish`
 - `dot_config/gh/config.yml` -> `~/.config/gh/config.yml`
-- `dot_codex/skills/` -> `~/.codex/skills/`
 - `private_dot_emacs.d/init.el` -> `~/.emacs.d/init.el`
 - `private_dot_emacs.d/config/myinit.org` -> `~/.emacs.d/config/myinit.org`
+- `run_after_sync-agent-skills.sh.tmpl` -> syncs `~/ghq/github.com/tsonobe1/agent-skills` into Codex and Claude skill directories
 
 ## Notes
 
 - Edit the `chezmoi` source files, not the files under `~`, when you want durable changes.
 - Run `chezmoi apply` after editing the source files.
 - Then commit and push this repository if you want the changes backed up on GitHub.
+- Agent skills are managed in `~/ghq/github.com/tsonobe1/agent-skills`, not in this dotfiles repo.
 - `~/.codex/skills/.system` and generated/cache-like Codex directories are intentionally not managed here.

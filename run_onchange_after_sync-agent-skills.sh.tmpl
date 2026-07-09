@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="$HOME/ghq/github.com/tsonobe1/agent-skills"
+remote="git@github.com:tsonobe1/agent-skills.git"
+
+if [ ! -d "$repo/.git" ]; then
+  mkdir -p "$(dirname "$repo")"
+  git clone "$remote" "$repo"
+fi
+
+"$repo/scripts/sync-live.sh"
