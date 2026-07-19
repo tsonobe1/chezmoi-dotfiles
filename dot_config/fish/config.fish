@@ -3,10 +3,10 @@ if status is-interactive
 end
 
 # homebrew path
-set PATH /opt/homebrew/bin/  $PATH
+fish_add_path --move --prepend /opt/homebrew/bin
 
 # nodebrew path
-set -x PATH $HOME/.nodebrew/current/bin:$PATH
+fish_add_path --move --prepend $HOME/.nodebrew/current/bin
 
 
 # ----------- alias ---------------
@@ -56,9 +56,7 @@ set -g fish_color_match --background=brblue
 
 # pnpm
 set -gx PNPM_HOME "/Users/tsonobe/Library/pnpm"
-if not string match -q -- $PNPM_HOME $PATH
-  set -gx PATH "$PNPM_HOME" $PATH
-end
+fish_add_path --move --prepend $PNPM_HOME
 # pnpm end
 
 # ghq / fzf / zoxide
