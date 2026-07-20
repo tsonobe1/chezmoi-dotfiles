@@ -1,0 +1,138 @@
+---
+name: parallel-session-guard
+description: Use when work may overlap another Codex session, branch, worktree, or changed file; when active session ownership must be checked; or when follow-up work may need to be queued to an existing owning session.
+---
+
+# Objective
+
+複数の Codex セッションを同時に進める前に、最近の作業と現在の Git 状態を照合し、競合しにくい作業領域を決める。
+
+**Core principle:** 同じbranch、編集領域、または設計責任の所有者を増やさない。ファイルの重複だけでは競合と断定せず、変更するsymbol・責務・仕様を比較する。所有セッションが実行中なら、そのturnを中断せず、ユーザーへ説明してから後続キューへ積む。
+
+# Use This Skill For
+
+- `並列で進めたい`
+- `今アクティブな session を確認して`
+- `main で何をやっているか確認して`
+- `このタスクが既存作業とぶつからないか見て`
+- `安全な worktree / branch を切って`
+- `担当ファイルを予約したい`
+
+# Outputs
+
+- recent session inventory
+- worktree / branch inventory
+- overlap assessment
+- recommendation:
+  - existing worktree を再利用する
+  - 新しい worktree を切る
+  - clean な worktree に新しい branch を切る
+  - owning session の後続キューへ積む
+  - 競合が強いので確認待ちにする
+
+# Canonical Sources
+
+- Codex appの`list_threads`: taskの`status`, ID, `hostId`, `cwd`, title
+- Codex appの`read_thread`: 候補taskの現在scopeとturn内容
+- Codex appの`wait_threads`: bounded snapshot、event cursor、新しい進捗の待機
+- Gitのworktree、branch、dirty state、diff: 実際の編集範囲
+
+`~/.codex/sessions`などの内部ログや更新時刻から、taskのactive状態や所有者を推測しない。Codex appのtask情報を確認できない場合は、正確な依頼先を特定できないものとして送信を止め、ユーザーへ報告する。
+
+# Workflow
+
+1. 現在の repo root、worktree、branch を確認する。
+2. `list_threads`をqueryなしで呼び、各repo worktree配下の`cwd`を持つtaskを集める。
+3. 候補taskを`read_thread`で確認し、ID、`hostId`、live `status`、現在scopeを特定する。
+4. `list_threads`の`cwd`とGitから対応worktree・branchを特定し、Git状態を集める。
+   - `git status --short --branch`
+   - `git worktree list --porcelain`
+   - 各 worktree について `git -C <worktree> status --short --branch`
+5. 必要なら変更範囲を比較する。
+   - 進行中 branch の変更範囲: `git diff --name-only origin/main...<branch>`
+   - local `main` に積まれた変更を前提にした比較: `git diff --name-only main...<branch>`
+   - dirty worktree は `git -C <worktree> status --short` の変更ファイルを優先して見る。
+6. taskとworktreeを対応付け、現在scopeとGit差分の両方から重複と競合を判定する。
+7. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
+8. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
+
+# Conflict Levels
+
+- `green`
+  - 別 worktree で、対象ファイルと feature area が重ならない
+- `yellow`
+  - 同じファイルでも、変更するsymbol・責務・仕様が分離している
+  - 同じ module や shared test / docs に触る
+  - separate worktree、編集領域のownership、統合順序の明示が前提
+- `red`
+  - 同じbranchまたは同じworktreeを複数sessionで編集しようとしている
+  - 同じ関数、型、プロパティ、または密接に結合したコード領域を変更する
+  - 同じ仕様、責務、設計判断、またはfeatureを別sessionが進めている
+  - 一方が対象ファイル全体の整形、分割、移動、生成を行う
+  - dirtyなdetached worktreeが同じ編集領域を触っている
+
+# Quick Reference
+
+| State | Action |
+| --- | --- |
+| `green` | 独立した作業領域で進める |
+| `yellow` | 別worktreeで編集領域と統合順序を明示して進める |
+| `red`かつ既存所有セッションが続ける | ユーザーへ事前説明し、所有セッションの後続キューへ積む |
+| `red`かつ所有者・scope・キュー動作が不明 | 送信も編集もせずユーザーへ確認する |
+
+## Same-File Decision
+
+同じファイルという事実は警告信号であり、それだけでは`red`にしない。
+
+| Overlap | Level |
+| --- | --- |
+| 別の関数・型・責務を変更し、仕様上も独立している | `yellow` |
+| 実装と、その変更領域に直接依存しないテストを変更する | `yellow` |
+| 同じsymbol、密接に結合した挙動、同じ設計判断を変更する | `red` |
+| ファイル全体の整形、分割、移動、生成が含まれる | `red` |
+| 予定するsymbol・責務を特定できず、独立性を確認できない | scopeを明確にするまで`red` |
+
+# Decision Rules
+
+- 並列作業が quick review で終わらないなら、同じ worktree ではなく別 worktree を優先する。
+- 新タスクが local `main` の未 push / 未 merge 変更に依存するなら、`origin/main` ではなく current `main` から切る。
+- detached worktree は再利用しない。必要なら先に名前付き branch へ退避する。
+- 同じファイルだけを理由に`red`へ分類しない。実際のdiffと予定するsymbol・責務・仕様を比較する。
+- `red` 判定なら、勝手に作業を始めず競合点を明示して確認する。
+- `yellow` 判定なら、別worktreeを使い、各sessionの編集領域と統合順序を先に言語化してから開始する。
+- 同一ファイルを並行編集したbranchは、先に一方を統合し、他方を最新の基準branchへ追従させて差分確認と関連テストを行う。
+- current task の編集symbol・責務が曖昧なら、独立性を確認できるまで`red`としてscopeを明確にする。
+
+# Queueing Policy
+
+**REQUIRED POLICY:** global `AGENTS.md`の「別セッションへの後続依頼」を正本として従う。このskillではユーザーへの事前説明、非割り込み、キュー受付と着手の区別を再定義しない。
+
+- 送信前に`read_thread`でactive turn summaryを記録し、別に`wait_threads`の`timeoutMs: 0`でevent cursorを取得する。
+- task IDと`hostId`を`send_message_to_thread`へ渡し、その結果で対象taskとキュー受付を確認する。
+- 送信直後は`read_thread`で同じactive turnが継続していることを確認する。後続着手は保存したevent cursorを`wait_threads.afterCursor`へ渡して待ち、`read_thread`で新しいturnとassistant出力を確認する。
+- 正確な依頼先、live状態、非割り込みのキュー動作、受付結果のいずれかを確認できない場合は送信しない。
+
+# Stop And Ask
+
+- 同じ編集領域、責務、またはfeatureを別sessionが触っており、既存所有セッションへ後続キューを積むのが適切か判断できない
+- Codex appのtask情報を取得できず、ID、`hostId`、live状態を確認できない
+- どの branch を基準に切るべきかで結論が変わる
+- dirty な detached worktree を処理しないと安全な切り出しができない
+- 既存の未 commit 変更を移動、stash、cleanup しないと進めない
+
+# Reporting Format
+
+結果は短く、次の順で返す。
+
+1. 今の自分の作業とぶつかるか
+2. live `status`を確認したtask / worktree
+3. 重複または競合の根拠
+4. 推奨する作業領域
+5. 後続キューへ積んだ場合は、対象セッション名・ID・受付状態
+6. 実際に作成した path / branch があればその場所
+
+# Notes
+
+- taskのactive / idleは必ず`list_threads`のlive `status`で判断する。
+- taskのscopeは`read_thread`と対応worktreeのGit差分の両方で裏取りする。
+- `main の作業を確認して`のような依頼では、task指定がなくてもlive task inventoryとcurrent `main`のcommit / diffを確認する。
