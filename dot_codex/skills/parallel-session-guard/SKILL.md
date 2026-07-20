@@ -29,26 +29,32 @@ description: Use when work may overlap another Codex session, branch, worktree, 
   - clean な worktree に新しい branch を切る
   - owning session の後続キューへ積む
   - 競合が強いので確認待ちにする
-- 必要なら reservation ledger の更新
+
+# Canonical Sources
+
+- Codex appの`list_threads`: taskの`status`, ID, `hostId`, `cwd`, title
+- Codex appの`read_thread`: 候補taskの現在scopeとturn内容
+- Codex appの`wait_threads`: bounded snapshot、event cursor、新しい進捗の待機
+- Gitのworktree、branch、dirty state、diff: 実際の編集範囲
+
+`~/.codex/sessions`などの内部ログや更新時刻から、taskのactive状態や所有者を推測しない。Codex appのtask情報を確認できない場合は、正確な依頼先を特定できないものとして送信を止め、ユーザーへ報告する。
 
 # Workflow
 
 1. 現在の repo root、worktree、branch を確認する。
-2. 直近の Codex session を集める。
-   - `python3 /Users/tsonobe/.codex/skills/parallel-session-guard/scripts/recent_sessions.py --repo-root <repo-root> --days 14 --limit 20`
-   - session ID を指定されたら `--session-id <id>` を付けて先にその session を確認する。
-3. Git 状態を集める。
+2. `list_threads`をqueryなしで呼び、各repo worktree配下の`cwd`を持つtaskを集める。
+3. 候補taskを`read_thread`で確認し、ID、`hostId`、live `status`、現在scopeを特定する。
+4. `list_threads`の`cwd`とGitから対応worktree・branchを特定し、Git状態を集める。
    - `git status --short --branch`
    - `git worktree list --porcelain`
    - 各 worktree について `git -C <worktree> status --short --branch`
-4. 必要なら変更範囲を比較する。
+5. 必要なら変更範囲を比較する。
    - 進行中 branch の変更範囲: `git diff --name-only origin/main...<branch>`
    - local `main` に積まれた変更を前提にした比較: `git diff --name-only main...<branch>`
    - dirty worktree は `git -C <worktree> status --short` の変更ファイルを優先して見る。
-5. session と worktree を対応付けて、重複と競合を判定する。
-6. 安全な作業領域を提案する。ユーザが作成まで求めたら、その場で branch / worktree を作る。
-7. `red`でも同じ所有セッションが続けるのが適切なら、新しい作業領域を作らず、後述の後続キューを使う。
-8. 長期運用なら reservation ledger を作るか更新する。
+6. taskとworktreeを対応付け、現在scopeとGit差分の両方から重複と競合を判定する。
+7. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
+8. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
 
 # Conflict Levels
 
@@ -97,46 +103,19 @@ description: Use when work may overlap another Codex session, branch, worktree, 
 - 同一ファイルを並行編集したbranchは、先に一方を統合し、他方を最新の基準branchへ追従させて差分確認と関連テストを行う。
 - current task の編集symbol・責務が曖昧なら、独立性を確認できるまで`red`としてscopeを明確にする。
 
-# Queueing Work For An Owning Session
+# Queueing Policy
 
-`red` conflictで既存セッションが対象branch、編集領域、または設計責任を所有しており、そのセッションへ後続作業を渡す場合:
+**REQUIRED POLICY:** global `AGENTS.md`の「別セッションへの後続依頼」を正本として従う。このskillではユーザーへの事前説明、非割り込み、キュー受付と着手の区別を再定義しない。
 
-1. 対象セッション名とID、branch、worktree、競合ファイル、現在のturn状態を確認する。
-2. 送信前に、競合の根拠、依頼先、依頼理由、現在のturnを中断せず後続キューへ積むことをユーザーへ伝える。承認済みscope内なら返答を待つ必要はない。
-3. 対象セッションがactiveでもidleになるまで待たず、Codex appの`send_message_to_thread`など、現在のturnをinterruptしないfollow-up機構で今キューへ積む。
-4. 受付結果の対象セッションIDを確認し、現在のturnが中断されていないことを`read_thread`または`wait_threads`で確認する。
-5. ユーザーへ対象セッション名とID、キュー受付結果を報告する。受付は「後続依頼がキューに入った」証拠であり、着手や完了の証拠ではない。
-6. 現在のturn完了後、新しいturnが開始したことを確認してから着手済みと報告する。
-7. 正確な依頼先、非割り込みのキュー動作、または受付結果を確認できない場合は送信しない。別worktreeで同じ編集領域を編集せず、ユーザーへblockerを報告する。
-
-## Queueing Red Flags
-
-- ユーザーへ伝える前に別セッションへ送ろうとしている
-- activeなセッションをinterruptして後続作業を優先しようとしている
-- follow-upキューが使えるのに、idleになるまで送らず依頼忘れの余地を残している
-- キュー受付を着手または完了として報告しようとしている
-- 同じsymbol・責務・設計判断を別worktreeで並行編集しようとしている
-
-## Queueing Rationalizations
-
-| Rationalization | Required response |
-| --- | --- |
-| 「実行中に送ると現在のturnへ混ざりそうなのでidleまで待つ」 | 非割り込みのfollow-upキューを使い、現在のturnが継続していることを確認する。待機で代用しない。 |
-| 「要件は承認済みなので、別セッションへ送ったことは後で報告すればよい」 | 承認済みでも、競合理由・依頼先・キュー投入を送信前に明示する。 |
-| 「受付成功なら作業は始まったとみなせる」 | 受付はキュー登録のみ。新しいturnの開始を別に確認する。 |
-
-# Reservation Ledger
-
-複数 session を継続運用するなら、repo root の `.codex/parallel-session-ledger.md` を使う。
-
-- 雛形: `/Users/tsonobe/.codex/skills/parallel-session-guard/references/ledger-template.md`
-- 予約時に `session_id`, `worktree`, `branch`, `scope`, `reserved_paths`, `status` を追記する
-- 終了時に `status` を `done` または `abandoned` に更新する
-- ユーザが求めない限り commit 対象にはしない
+- 送信前に`read_thread`でactive turn summaryを記録し、別に`wait_threads`の`timeoutMs: 0`でevent cursorを取得する。
+- task IDと`hostId`を`send_message_to_thread`へ渡し、その結果で対象taskとキュー受付を確認する。
+- 送信直後は`read_thread`で同じactive turnが継続していることを確認する。後続着手は保存したevent cursorを`wait_threads.afterCursor`へ渡して待ち、`read_thread`で新しいturnとassistant出力を確認する。
+- 正確な依頼先、live状態、非割り込みのキュー動作、受付結果のいずれかを確認できない場合は送信しない。
 
 # Stop And Ask
 
 - 同じ編集領域、責務、またはfeatureを別sessionが触っており、既存所有セッションへ後続キューを積むのが適切か判断できない
+- Codex appのtask情報を取得できず、ID、`hostId`、live状態を確認できない
 - どの branch を基準に切るべきかで結論が変わる
 - dirty な detached worktree を処理しないと安全な切り出しができない
 - 既存の未 commit 変更を移動、stash、cleanup しないと進めない
@@ -146,7 +125,7 @@ description: Use when work may overlap another Codex session, branch, worktree, 
 結果は短く、次の順で返す。
 
 1. 今の自分の作業とぶつかるか
-2. 直近でアクティブな session / worktree
+2. live `status`を確認したtask / worktree
 3. 重複または競合の根拠
 4. 推奨する作業領域
 5. 後続キューへ積んだ場合は、対象セッション名・ID・受付状態
@@ -154,16 +133,6 @@ description: Use when work may overlap another Codex session, branch, worktree, 
 
 # Notes
 
-- session の「active」は厳密な live 状態ではなく、最近のログ更新時刻で判断する
-- session ログだけで scope が読めないときは、対応する worktree の Git 差分を優先する
-- `main の作業を確認して` のような依頼では、session 指定がなくても recent session inventory と current `main` の commit / diff の両方で裏取りする
-
-# Invocation
-
-ユーザが次のように言ったら、この skill を使う。
-
-- `parallel-session-guard で見て`
-- `並列作業の衝突を避けたい`
-- `active な session を棚卸しして`
-- `競合しない worktree を用意して`
-- `この task が今の main と重複しないか見て`
+- taskのactive / idleは必ず`list_threads`のlive `status`で判断する。
+- taskのscopeは`read_thread`と対応worktreeのGit差分の両方で裏取りする。
+- `main の作業を確認して`のような依頼では、task指定がなくてもlive task inventoryとcurrent `main`のcommit / diffを確認する。
