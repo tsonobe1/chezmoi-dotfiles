@@ -32,29 +32,51 @@ description: Use when work may overlap another Codex session, branch, worktree, 
 
 # Canonical Sources
 
+- Ugenの`scripts/worktrees/preflight.mjs`: baseline、登録worktree、変更分類、file overlap
 - Codex appの`list_threads`: taskの`status`, ID, `hostId`, `cwd`, title
 - Codex appの`read_thread`: 候補taskの現在scopeとturn内容
 - Codex appの`wait_threads`: bounded snapshot、event cursor、新しい進捗の待機
-- Gitのworktree、branch、dirty state、diff: 実際の編集範囲
+- Ugen preflightが存在しないcheckoutでのみ、Gitのworktree、branch、dirty state、diff
 
 `~/.codex/sessions`などの内部ログや更新時刻から、taskのactive状態や所有者を推測しない。Codex appのtask情報を確認できない場合は、正確な依頼先を特定できないものとして送信を止め、ユーザーへ報告する。
+
+# Ugen Preflight
+
+repo rootに`scripts/worktrees/preflight.mjs`が存在する場合は、個別Git確認より先に、repo rootから引数なしで1回だけ実行する。
+
+```sh
+./scripts/worktrees/preflight.mjs
+```
+
+開始判断に使えるのは、終了codeが`0`で、stdoutが1個のJSON objectとしてparseでき、次の契約をすべて満たす場合だけとする。
+
+- `schemaVersion === 1`、`complete === true`、`refreshed === true`
+- `baseline.ref === "origin/main"`で、`baseline.sha`が空でない
+- `worktrees`、`fileOverlaps`、`errors`がarrayで、`errors`が空
+- 各worktreeに`path`、`branch`、`head`、`detached`、`locked`、`prunable`、`changes`があり、`changes`が`null`ではない
+
+scriptが存在するのに、実行失敗、非zero終了、JSON parse失敗、未知のschema、欠けたkey、`complete: false`、`refreshed: false`のいずれかになった場合はfail closedとする。個別Git commandへfallbackして開始可能と判定してはならない。
+
+script自体が存在しない古いbranchまたは別repoでのみ、従来の個別Git確認へfallbackする。validなpreflightを取得した場合、同じGit状態を個別commandで再収集しない。
 
 # Workflow
 
 1. 現在の repo root、worktree、branch を確認する。
-2. `list_threads`をqueryなしで呼び、各repo worktree配下の`cwd`を持つtaskを集める。
-3. 候補taskを`read_thread`で確認し、ID、`hostId`、live `status`、現在scopeを特定する。
-4. `list_threads`の`cwd`とGitから対応worktree・branchを特定し、Git状態を集める。
+2. Ugen preflightが存在すれば1回実行し、契約を検証する。invalidなら停止する。
+3. preflightが存在しない場合だけ、従来のGit状態を集める。
    - `git status --short --branch`
    - `git worktree list --porcelain`
    - 各 worktree について `git -C <worktree> status --short --branch`
-5. 必要なら変更範囲を比較する。
+4. 従来確認で必要なら変更範囲を比較する。
    - 進行中 branch の変更範囲: `git diff --name-only origin/main...<branch>`
    - local `main` に積まれた変更を前提にした比較: `git diff --name-only main...<branch>`
    - dirty worktree は `git -C <worktree> status --short` の変更ファイルを優先して見る。
-6. taskとworktreeを対応付け、現在scopeとGit差分の両方から重複と競合を判定する。
-7. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
-8. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
+5. `list_threads`をqueryなしで呼び、各repo worktree配下の`cwd`を持つtaskを集める。
+6. 候補taskを`read_thread`で確認し、ID、`hostId`、live `status`、現在scopeを特定する。
+7. taskの`cwd`をworktree pathへ対応付ける。preflightの`fileOverlaps`は候補抽出に使うが、それだけで競合と断定しない。
+8. 現在scopeと変更するsymbol・責務・仕様からgreen / yellow / redを判定する。
+9. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
+10. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
 
 # Conflict Levels
 
@@ -125,11 +147,12 @@ description: Use when work may overlap another Codex session, branch, worktree, 
 結果は短く、次の順で返す。
 
 1. 今の自分の作業とぶつかるか
-2. live `status`を確認したtask / worktree
-3. 重複または競合の根拠
-4. 推奨する作業領域
-5. 後続キューへ積んだ場合は、対象セッション名・ID・受付状態
-6. 実際に作成した path / branch があればその場所
+2. Git状態の取得元（preflightまたはfallback）と完全性
+3. live `status`を確認したtask / worktree
+4. 重複または競合の根拠
+5. 推奨する作業領域
+6. 後続キューへ積んだ場合は、対象セッション名・ID・受付状態
+7. 実際に作成した path / branch があればその場所
 
 # Notes
 
