@@ -66,9 +66,9 @@ scriptが存在するのに、実行失敗、非zero終了、JSON parse失敗、
 
 # Workflow
 
-1. 現在の repo root、worktree、branch を確認する。
-2. 正確なpath lookupが存在を確認した場合は、120秒のhard deadlineでUgen preflightを1回実行して契約を検証する。invalidまたはtimeoutなら停止する。
-3. 正確なpath lookupが`ENOENT`を返した場合だけ、従来のGit状態を集める。
+1. repo rootだけを解決する。この時点ではbranch、worktree、diffを個別Git commandで収集しない。
+2. 正確なpath lookupが存在を確認した場合は、120秒のhard deadlineでUgen preflightを1回実行して契約を検証する。invalidまたはtimeoutならGit証拠を不完全として開始・競合判定をblockするが、live task確認は続ける。
+3. 正確なpath lookupが`ENOENT`を返した場合だけ、現在のbranch、worktree、従来のGit状態を集める。
    - `git status --short --branch`
    - `git worktree list --porcelain`
    - 各 worktree について `git -C <worktree> status --short --branch`
@@ -78,10 +78,12 @@ scriptが存在するのに、実行失敗、非zero終了、JSON parse失敗、
    - dirty worktree は `git -C <worktree> status --short` の変更ファイルを優先して見る。
 5. `list_threads`をqueryなしで呼び、各repo worktree配下の`cwd`を持つtaskを集める。
 6. 候補taskを`read_thread`で確認し、ID、`hostId`、live `status`、現在scopeを特定する。
-7. taskの`cwd`をworktree pathへ対応付ける。validなpreflightでは`changes`をGit差分証拠、`fileOverlaps`を候補抽出に使うが、それだけで競合と断定しない。
-8. 現在scopeと変更するsymbol・責務・仕様からgreen / yellow / redを判定する。
-9. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
-10. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
+7. Git証拠が不完全なら、契約違反とlive task inventoryを報告して停止する。開始・競合判定・作業領域提案は行わない。
+8. taskの`cwd`をworktree pathへ対応付ける。validなpreflightでは`changes`をGit差分証拠、`fileOverlaps`を既存worktree同士の重複候補抽出に使うが、それだけで競合と断定しない。
+9. 新しい作業の予定file、symbol、責務、仕様を、live taskとの対応有無にかかわらず、変更のある全worktreeの`changes`と比較する。
+10. live taskの現在scopeも加えてgreen / yellow / redを判定する。
+11. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
+12. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
 
 # Conflict Levels
 
@@ -125,6 +127,7 @@ scriptが存在するのに、実行失敗、非zero終了、JSON parse失敗、
 - 新タスクが local `main` の未 push / 未 merge 変更に依存するなら、`origin/main` ではなく current `main` から切る。
 - detached worktree は再利用しない。必要なら先に名前付き branch へ退避する。
 - 同じファイルだけを理由に`red`へ分類しない。validなpreflightの`changes`またはfallback時のGit diffと、予定するsymbol・責務・仕様を比較する。
+- live taskに対応しないworktreeの変更も、競合候補から除外しない。
 - `red` 判定なら、勝手に作業を始めず競合点を明示して確認する。
 - `yellow` 判定なら、別worktreeを使い、各sessionの編集領域と統合順序を先に言語化してから開始する。
 - 同一ファイルを並行編集したbranchは、先に一方を統合し、他方を最新の基準branchへ追従させて差分確認と関連テストを行う。
