@@ -42,28 +42,33 @@ description: Use when work may overlap another Codex session, branch, worktree, 
 
 # Ugen Preflight
 
-repo rootに`scripts/worktrees/preflight.mjs`が存在する場合は、個別Git確認より先に、repo rootから引数なしで1回だけ実行する。
+repo rootを解決し、正確なpathの存在確認が成功して`scripts/worktrees/preflight.mjs`が存在する場合は、個別Git確認より先に、repo rootから引数なしで1回だけ実行する。実行前にmonotonic clockで120秒後のdeadlineを記録し、独立してterminateできるjobとして開始する。deadlineまでpollし、未完了なら実行toolのterminate機能でjobのprocess treeを強制終了して、停止済みを確認する。この制御を保証できない場合は実行せずfail closedとする。
 
 ```sh
+# execution tool: hard timeout 120 seconds; terminate process tree on expiry
 ./scripts/worktrees/preflight.mjs
 ```
 
-開始判断に使えるのは、終了codeが`0`で、stdoutが1個のJSON objectとしてparseでき、次の契約をすべて満たす場合だけとする。
+timeoutまたは強制終了は1回の実行を消費した契約違反とし、再実行も個別Git確認へのfallbackも行わない。
+
+開始判断に使えるのは、終了codeが`0`で、stdoutが1個のarrayではないnon-null objectとしてparseでき、次の型契約をすべて満たす場合だけとする。
 
 - `schemaVersion === 1`、`complete === true`、`refreshed === true`
-- `baseline.ref === "origin/main"`で、`baseline.sha`が空でない
-- `worktrees`、`fileOverlaps`、`errors`がarrayで、`errors`が空
-- 各worktreeに`path`、`branch`、`head`、`detached`、`locked`、`prunable`、`changes`があり、`changes`が`null`ではない
+- `baseline`はobject、`ref === "origin/main"`、`sha`は空でないstring
+- `worktrees`はobjectのarray。`path`と`head`はstring、`branch`、`lockReason`、`prunableReason`はstringまたは`null`、`detached`、`locked`、`prunable`はboolean
+- 各`changes`はobjectで、`committed`、`staged`、`unstaged`、`untracked`、`allPaths`はstringのarray
+- `fileOverlaps`はobjectのarrayで、各`worktreePaths`と`paths`はstringのarray
+- `errors`はobjectのarrayで、各`code`と`message`、任意の`worktreePath`はstring。開始判断時は空
 
-scriptが存在するのに、実行失敗、非zero終了、JSON parse失敗、未知のschema、欠けたkey、`complete: false`、`refreshed: false`のいずれかになった場合はfail closedとする。個別Git commandへfallbackして開始可能と判定してはならない。
+scriptが存在するのに、実行失敗、非zero終了、JSON parse失敗、型不正、未知のschema、欠けたkey、`complete: false`、`refreshed: false`のいずれかになった場合はfail closedとする。個別Git commandへfallbackして開始可能と判定してはならない。
 
-script自体が存在しない古いbranchまたは別repoでのみ、従来の個別Git確認へfallbackする。validなpreflightを取得した場合、同じGit状態を個別commandで再収集しない。
+従来の個別Git確認へfallbackできるのは、repo rootの解決に成功した後、正確なscript pathの存在確認が`ENOENT`を返した場合だけとする。権限、I/O、root解決、script実行時の`ENOENT`を含む他の失敗はすべてfail closedとする。validなpreflightの`changes`を対応worktreeのGit差分証拠として使い、同じ状態を個別commandで再収集しない。
 
 # Workflow
 
 1. 現在の repo root、worktree、branch を確認する。
-2. Ugen preflightが存在すれば1回実行し、契約を検証する。invalidなら停止する。
-3. preflightが存在しない場合だけ、従来のGit状態を集める。
+2. 正確なpath lookupが存在を確認した場合は、120秒のhard deadlineでUgen preflightを1回実行して契約を検証する。invalidまたはtimeoutなら停止する。
+3. 正確なpath lookupが`ENOENT`を返した場合だけ、従来のGit状態を集める。
    - `git status --short --branch`
    - `git worktree list --porcelain`
    - 各 worktree について `git -C <worktree> status --short --branch`
@@ -73,7 +78,7 @@ script自体が存在しない古いbranchまたは別repoでのみ、従来の�
    - dirty worktree は `git -C <worktree> status --short` の変更ファイルを優先して見る。
 5. `list_threads`をqueryなしで呼び、各repo worktree配下の`cwd`を持つtaskを集める。
 6. 候補taskを`read_thread`で確認し、ID、`hostId`、live `status`、現在scopeを特定する。
-7. taskの`cwd`をworktree pathへ対応付ける。preflightの`fileOverlaps`は候補抽出に使うが、それだけで競合と断定しない。
+7. taskの`cwd`をworktree pathへ対応付ける。validなpreflightでは`changes`をGit差分証拠、`fileOverlaps`を候補抽出に使うが、それだけで競合と断定しない。
 8. 現在scopeと変更するsymbol・責務・仕様からgreen / yellow / redを判定する。
 9. 安全な作業領域を提案する。ユーザーが作成まで求めたら、その場でbranch / worktreeを作る。
 10. `red`でも同じ所有taskが続けるのが適切なら、新しい作業領域を作らず、global `AGENTS.md`の後続依頼ルールに従う。
@@ -119,7 +124,7 @@ script自体が存在しない古いbranchまたは別repoでのみ、従来の�
 - 並列作業が quick review で終わらないなら、同じ worktree ではなく別 worktree を優先する。
 - 新タスクが local `main` の未 push / 未 merge 変更に依存するなら、`origin/main` ではなく current `main` から切る。
 - detached worktree は再利用しない。必要なら先に名前付き branch へ退避する。
-- 同じファイルだけを理由に`red`へ分類しない。実際のdiffと予定するsymbol・責務・仕様を比較する。
+- 同じファイルだけを理由に`red`へ分類しない。validなpreflightの`changes`またはfallback時のGit diffと、予定するsymbol・責務・仕様を比較する。
 - `red` 判定なら、勝手に作業を始めず競合点を明示して確認する。
 - `yellow` 判定なら、別worktreeを使い、各sessionの編集領域と統合順序を先に言語化してから開始する。
 - 同一ファイルを並行編集したbranchは、先に一方を統合し、他方を最新の基準branchへ追従させて差分確認と関連テストを行う。
@@ -157,5 +162,5 @@ script自体が存在しない古いbranchまたは別repoでのみ、従来の�
 # Notes
 
 - taskのactive / idleは必ず`list_threads`のlive `status`で判断する。
-- taskのscopeは`read_thread`と対応worktreeのGit差分の両方で裏取りする。
-- `main の作業を確認して`のような依頼では、task指定がなくてもlive task inventoryとcurrent `main`のcommit / diffを確認する。
+- taskのscopeは`read_thread`と、validなpreflightの`changes`またはfallback時の対応worktree Git diffの両方で裏取りする。
+- `main の作業を確認して`のような依頼では、task指定がなくてもlive task inventoryと、validなpreflightのbaseline / `changes`、またはfallback時のcurrent `main` commit / diffを確認する。
