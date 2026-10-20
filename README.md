@@ -52,7 +52,7 @@ git push
 | Fish | `dot_config/fish/` の起動設定・プロンプトなど → `~/.config/fish/` の対応ファイル |
 | GitHub CLI | `dot_config/gh/config.yml` → `~/.config/gh/config.yml` |
 | tmux | `dot_tmux.conf` → `~/.tmux.conf` |
-| Emacs | `private_dot_emacs.d/init.el` と `config/myinit.org` → `~/.emacs.d/` の対応ファイル |
+| Emacs | `private_dot_emacs.d/init.el` と `private_dot_emacs.d/config/myinit.org` → `~/.emacs.d/` の対応ファイル |
 | Codex 共通指示 | `dot_codex/AGENTS.md` → `~/.codex/AGENTS.md` |
 | chezmoi | `dot_config/chezmoi/chezmoi.toml.tmpl` → `~/.config/chezmoi/chezmoi.toml` |
 
