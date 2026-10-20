@@ -1,10 +1,80 @@
 # chezmoi dotfiles
 
-This repository is the source of truth for local dotfiles managed by `chezmoi`.
+PC の設定ファイルと、Codex への共通指示を管理するリポジトリです。
+このリポジトリを編集し、`chezmoi apply` で実際の使用場所へ反映します。
+スキル本体の編集・変更履歴は [agent-skills](https://github.com/tsonobe1/agent-skills) が担当します。
 
-## Mac setup
+## 責務と使い分け
 
-On a new Mac, install `ghq` and `chezmoi`, clone this repository under `ghq`, and initialize `chezmoi` from that source directory.
+| やりたいこと | 編集先・使うもの |
+| --- | --- |
+| シェル・Git・tmux・Emacs などの設定を変える | このリポジトリの対応ファイル |
+| Codex への共通指示を変える | `dot_codex/AGENTS.md` |
+| 設定を PC に反映する | `chezmoi diff` → `chezmoi apply` |
+| 設定の変更を GitHub に保存する | このリポジトリで commit / push |
+| スキルの内容を変える、追加・削除する | `agent-skills`。操作はそちらの README を参照 |
+| 新しい PC に環境を用意する | 下記の Mac セットアップ。スキル環境の準備処理も含む |
+
+管理元は `~/ghq/github.com/tsonobe1/chezmoi-dotfiles`、反映先はホームディレクトリです。
+ghq はリポジトリの取得・配置を整理し、chezmoi は設定を使用場所へ反映します。
+この構成では、設定は通常のファイルとして配置します。
+
+## 普段の設定変更
+
+1. このリポジトリの対象ファイルを編集する。
+2. `chezmoi diff` で使用中のファイルとの差分を確認する。
+3. `chezmoi apply` で、管理元の内容を使用場所へ反映する。
+4. 変更したファイルを選んで commit / push する。
+
+例えば Zsh の設定を変更する場合:
+
+```bash
+cd "$HOME/ghq/github.com/tsonobe1/chezmoi-dotfiles"
+vi dot_zshrc
+chezmoi diff
+chezmoi apply
+git diff
+git add -- dot_zshrc
+git commit -m "Keep shell setup reproducible across Macs"
+git push
+```
+
+使用場所のファイルを直接編集した場合は、`chezmoi diff` で比較し、採用する変更を
+`chezmoi add` で管理元へ取り込みます。例えば `chezmoi add "$HOME/.zshrc"` です。
+`apply` は管理元から使用場所への反映なので、使用場所の変更を残したいときは先に確認します。
+
+## 管理している設定
+
+| 設定 | 管理元 → 使用場所 |
+| --- | --- |
+| Git | `dot_gitconfig` → `~/.gitconfig`、`dot_gitignore_global` → `~/.gitignore_global` |
+| Zsh | `dot_zprofile` → `~/.zprofile`、`dot_zshrc` → `~/.zshrc` |
+| Fish | `dot_config/fish/` の起動設定・プロンプトなど → `~/.config/fish/` の対応ファイル |
+| GitHub CLI | `dot_config/gh/config.yml` → `~/.config/gh/config.yml` |
+| tmux | `dot_tmux.conf` → `~/.tmux.conf` |
+| Emacs | `private_dot_emacs.d/init.el` と `config/myinit.org` → `~/.emacs.d/` の対応ファイル |
+| Codex 共通指示 | `dot_codex/AGENTS.md` → `~/.codex/AGENTS.md` |
+| chezmoi | `dot_config/chezmoi/chezmoi.toml.tmpl` → `~/.config/chezmoi/chezmoi.toml` |
+
+説明用のこの README も `~/README.md` に配置します。
+管理対象の正確な一覧は `chezmoi managed --include=files,symlinks` で確認できます。
+Codex の標準スキル・プラグイン・会話履歴などは、このリポジトリの管理対象に含まれません。
+
+## agent-skills との連携
+
+[準備処理](./run_onchange_after_sync-agent-skills.sh.tmpl) は、初回、または処理自体の内容が
+変わったときに、`chezmoi apply` の中で次を行います。
+
+1. `agent-skills` がなければ、`~/ghq/github.com/tsonobe1/agent-skills` に clone する。
+2. そのリポジトリの `scripts/sync-live.sh` を呼び、Codex / Claude / Grok Build 側のリンクを整える。
+
+既存の `agent-skills` に対する pull や、スキルの内容の編集は、この準備処理には含まれません。
+日常のスキル編集は `agent-skills` で行い、各ツールはリンク先の本体を読みます。
+新しいスキルのリンク作成、変更の commit / push も、`agent-skills` 側の運用です。
+
+## 新しい Mac のセットアップ
+
+GitHub のリポジトリを取得できる状態で、ghq と chezmoi を導入し、設定を反映します。
 
 ```bash
 brew install ghq chezmoi
@@ -12,70 +82,10 @@ ghq get git@github.com:tsonobe1/chezmoi-dotfiles.git
 chezmoi init --source "$HOME/ghq/github.com/tsonobe1/chezmoi-dotfiles" --apply
 ```
 
-これで、chezmoi が管理している `~/.zshrc`、`~/.config/fish/config.fish`、`~/.gitconfig` などが、それぞれ本来の場所に反映されます。
-
-## Source of truth
-
-- Source repo: `~/ghq/github.com/tsonobe1/chezmoi-dotfiles`
-- Apply destination: `~`
-- Remote: `git@github.com:tsonobe1/chezmoi-dotfiles.git`
-
-`chezmoi` manages the files in this repository and writes them to their real locations such as `~/.gitconfig` and `~/.config/fish/config.fish`.
-
-## Daily workflow
-
-Edit files in this repository first.
-
-Examples:
+スキルの commit 後・merge 後にリンクを自動整備する Git hook は、別途一度だけ設定します。
 
 ```bash
-cd ~/ghq/github.com/tsonobe1/chezmoi-dotfiles
-vi dot_gitconfig
-vi dot_config/fish/config.fish
-vi private_dot_emacs.d/config/myinit.org
+"$HOME/ghq/github.com/tsonobe1/agent-skills/scripts/install-hooks.sh"
 ```
 
-Apply changes to the real locations:
-
-```bash
-chezmoi apply
-```
-
-Check what will change before applying:
-
-```bash
-chezmoi diff
-```
-
-## Save changes to GitHub
-
-```bash
-cd ~/ghq/github.com/tsonobe1/chezmoi-dotfiles
-git status
-git add .
-git commit -m "Update dotfiles"
-git push
-```
-
-## Managed files
-
-Current examples in this repo:
-
-- `dot_gitconfig` -> `~/.gitconfig`
-- `dot_gitignore_global` -> `~/.gitignore_global`
-- `dot_tmux.conf` -> `~/.tmux.conf`
-- `dot_zprofile` -> `~/.zprofile`
-- `dot_zshrc` -> `~/.zshrc`
-- `dot_config/fish/config.fish` -> `~/.config/fish/config.fish`
-- `dot_config/gh/config.yml` -> `~/.config/gh/config.yml`
-- `private_dot_emacs.d/init.el` -> `~/.emacs.d/init.el`
-- `private_dot_emacs.d/config/myinit.org` -> `~/.emacs.d/config/myinit.org`
-- `run_after_sync-agent-skills.sh.tmpl` -> syncs `~/ghq/github.com/tsonobe1/agent-skills` into Codex and Claude skill directories
-
-## Notes
-
-- Edit the `chezmoi` source files, not the files under `~`, when you want durable changes.
-- Run `chezmoi apply` after editing the source files.
-- Then commit and push this repository if you want the changes backed up on GitHub.
-- Agent skills are managed in `~/ghq/github.com/tsonobe1/agent-skills`, not in this dotfiles repo.
-- `~/.codex/skills/.system` and generated/cache-like Codex directories are intentionally not managed here.
+以降のスキル編集・同期は、[agent-skills の README](https://github.com/tsonobe1/agent-skills) を参照します。
