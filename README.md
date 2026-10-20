@@ -66,12 +66,12 @@ Codex の標準スキル・プラグイン・会話履歴などは、このリ�
 
 | 種類 | 役割・例 | 管理するリポジトリ |
 | --- | --- | --- |
-| `~/.codex/AGENTS.md` | 作業全般に適用するルール。現在は作業報告の書き方や、別セッションへの依頼方法 | このリポジトリの [dot_codex/AGENTS.md](./dot_codex/AGENTS.md) |
+| `~/.codex/AGENTS.md` | 作業全般に適用するルール。現在は作業報告の書き方や、別セッションへの依頼方法 | このリポジトリの [dot_codex/AGENTS.md](https://github.com/tsonobe1/chezmoi-dotfiles/blob/main/dot_codex/AGENTS.md) |
 | スキルの `SKILL.md` | 必要に応じて読み込む、特定の作業の手順。例えば TDD、レビュー、UI 仕様の策定 | [agent-skills](https://github.com/tsonobe1/agent-skills) |
 
 ## agent-skills との連携
 
-[準備処理](./run_onchange_after_sync-agent-skills.sh.tmpl) は、初回、または処理自体の内容が
+[準備処理](https://github.com/tsonobe1/chezmoi-dotfiles/blob/main/run_onchange_after_sync-agent-skills.sh.tmpl) は、初回、または処理自体の内容が
 変わったときに、`chezmoi apply` の中で次を行います。
 
 1. `agent-skills` がなければ、`~/ghq/github.com/tsonobe1/agent-skills` に clone する。
