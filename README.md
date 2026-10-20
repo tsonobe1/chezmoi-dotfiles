@@ -1,6 +1,6 @@
 # chezmoi dotfiles
 
-PC の設定ファイルと、Codex への共通指示を管理するリポジトリです。
+シェル・Git・tmux・Emacs など、PC の設定ファイルを管理するリポジトリです。
 このリポジトリを編集し、`chezmoi apply` で実際の使用場所へ反映します。
 スキル本体の編集・変更履歴は [agent-skills](https://github.com/tsonobe1/agent-skills) が担当します。
 
@@ -9,7 +9,7 @@ PC の設定ファイルと、Codex への共通指示を管理するリポジ�
 | やりたいこと | 編集先・使うもの |
 | --- | --- |
 | シェル・Git・tmux・Emacs などの設定を変える | このリポジトリの対応ファイル |
-| Codex への共通指示を変える | `dot_codex/AGENTS.md` |
+| Codex が作業全般で守るルールを変える | `dot_codex/AGENTS.md` |
 | 設定を PC に反映する | `chezmoi diff` → `chezmoi apply` |
 | 設定の変更を GitHub に保存する | このリポジトリで commit / push |
 | スキルの内容を変える、追加・削除する | `agent-skills`。操作はそちらの README を参照 |
@@ -53,12 +53,21 @@ git push
 | GitHub CLI | `dot_config/gh/config.yml` → `~/.config/gh/config.yml` |
 | tmux | `dot_tmux.conf` → `~/.tmux.conf` |
 | Emacs | `private_dot_emacs.d/init.el` と `private_dot_emacs.d/config/myinit.org` → `~/.emacs.d/` の対応ファイル |
-| Codex 共通指示 | `dot_codex/AGENTS.md` → `~/.codex/AGENTS.md` |
+| Codex の作業ルール | `dot_codex/AGENTS.md` → `~/.codex/AGENTS.md` |
 | chezmoi | `dot_config/chezmoi/chezmoi.toml.tmpl` → `~/.config/chezmoi/chezmoi.toml` |
 
 説明用のこの README も `~/README.md` に配置します。
 管理対象の正確な一覧は `chezmoi managed --include=files,symlinks` で確認できます。
 Codex の標準スキル・プラグイン・会話履歴などは、このリポジトリの管理対象に含まれません。
+
+## Codex の AGENTS.md とスキルの違い
+
+どちらも指示を書くファイルですが、使う場面が異なります。
+
+| 種類 | 役割・例 | 管理するリポジトリ |
+| --- | --- | --- |
+| `~/.codex/AGENTS.md` | 作業全般に適用するルール。現在は作業報告の書き方や、別セッションへの依頼方法 | このリポジトリの [dot_codex/AGENTS.md](./dot_codex/AGENTS.md) |
+| スキルの `SKILL.md` | 必要に応じて読み込む、特定の作業の手順。例えば TDD、レビュー、UI 仕様の策定 | [agent-skills](https://github.com/tsonobe1/agent-skills) |
 
 ## agent-skills との連携
 
