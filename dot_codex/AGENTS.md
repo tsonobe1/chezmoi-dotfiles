@@ -15,4 +15,6 @@
 
 ## 文章の書き方
 
-PR・Issueの本文やコメント、ユーザーへの説明・途中報告・完了報告を書くときは、`structured-writing`を使う。
+人が読む文章には、共通原則として`structured-writing`を使う。
+Issueのタイトル・本文・コメントを作成・修正するときは、`issue-writing`を使う。
+PRのタイトル・本文・コメントを作成・修正するときは、`pr-writing`を使う。
